@@ -1,0 +1,196 @@
+.\" Copyright (c) 2013 SURFnet bv
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of SURFnet bv nor the names of its contributors 
+.\"    may be used to endorse or promote products derived from this 
+.\"    software without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+.\" WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+.\" DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+.\" GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+.\" INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+.\" IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+.\" OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+.\" IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+.\"
+.TH DANISH 1 "August 2013" "Roland van Rijswijk-Deij" "Internet / DNS"
+.SH NAME
+danish \- generate TLSA records and check X.509 certificate information
+.SH SYNOPSIS
+.B danish -n 
+.I hostname
+.B -c 
+.I certfile
+.B [-e] [-m] [-r 
+.I reqfile
+.B ] -p 
+.I port
+.B -P  
+.I tcp
+.B | 
+.I udp
+.B -u 
+.I 0-3
+.B -s
+.I 0-1
+.B -m
+.I 1-2
+.B -q
+
+.B danish -h
+
+.B danish -v
+.SH DESCRIPTION
+.B danish
+generates TLSA records compliant with
+.I RFC 6698
+from X.509 certificates. In addition to generating TLSA records
+.B danish
+can also perform a number of checks on certificates and outputs the
+status of these checks, both as text as well as a return value that can
+be checked from scripts and other programs.
+.SH OPTIONS
+.IP "-n hostname"
+Generate a TLSA record for
+.I hostname
+.IP "-c certfile"
+Read the X.509 certificate from
+.I certfile
+; certificates in both ASN.1 DER as well as in PEM encoding are supported.
+.IP "[-e]"
+Check if the certificate is valid or has expired; uses the current
+system time.
+.IP "[-m]"
+Match the
+.I hostname
+specified with the
+.B -n
+option against the subject and the subjectAltName of the certificate to
+check if the certificate is valid for the specified
+.I hostname
+.IP "-r reqfile"
+Matches the X.509 certificate against the certificate signing request
+(CSR) read from
+.I reqfile
+; the check matches the subject and subjectAltName of the certificate
+to the request and checks if the public key in the certificate matches
+the public key in the request.
+.IP "-p port"
+Specifies the
+.I port
+to which the TLSA record that will be generated pertains
+.IP "-P tcp | udp"
+Specifies the protocol (TCP or UDP) to which the TLSA record that will
+be generated pertains
+.IP "-u 0-3"
+Specifies the TLSA record certificate usage (see RFC 6698, section 2.1.1);
+valid uses are:
+.RS
+.P 
+0 - CA certificate constraint; the TLSA record limits certificates
+for
+.I hostname
+to those issued below the CA certificate referenced in the TLSA record.
+.B Note:
+do not combine this usage with the -m option since the hostname will
+not match the subject or subjectAltName of the certificate.
+.RE
+.RS
+.P
+1 - End-entity certificate constraint with PKIX validation; clients MUST
+check that the certificate they receive from
+.I hostname
+on
+.I port
+with the specified protocol (TCP or UDP) matches the certificate
+specified in the TLSA record. In addition to this, the certificate
+should validate against the PKIX certificate chain.
+.RE
+.RS
+.P
+2 - Trust anchor; the TLSA record specifies a trust anchor (usually an
+internal CA) from which PKIX validation of the certificate for
+.I hostname
+on
+.I port
+should succeed.
+.RE
+.RS
+.P
+3 - Self-signed certificate; the TLSA record specifies a valid end-entity
+certificate for
+.I hostname
+on
+.I port
+; clients MUST NOT perform PKIX validation on the certificate.
+.RE
+.IP "-s 0-1"
+Specifies the TLSA record selector field (see RFC 6698, section 2.1.2);
+valid selector values are:
+.RS
+.P
+0 - Full certificate; the entire X.509 certificate a client sees for
+.I hostname
+on
+.I port
+must match the TLSA record.
+.RE
+.RS
+.P
+1 - subjectPublicKeyInfo; only the public key value encoded in the
+.I subjectPublicKeyInfo
+field of the certificate that a client sees for
+.I hostname
+on
+.I port
+must match the TLSA record.
+.RE
+.IP "-m 1-2"
+Specifies the TLSA record matching type field (see RFC 6698, section
+2.1.3); valid matching field values are:
+.RS
+.P
+1 - SHA256 hash of the content selected using the
+.I selector
+.RE
+.RS
+.P
+2 - SHA512 hash of the content selected using the
+.I selector
+.RE
+.IP "-q"
+Be quiet; suppresses any error messages output to
+.B stdout
+or
+.B stderr
+and only outputs the TLSA record.
+.IP "-h"
+Print a short help summary of the options supported by
+.B danish
+.IP "-v"
+Output version information
+.SH INTEGRATING WITH ZONE PUBLICATION TOOL CHAIN
+For more information on how to integrate
+.B danish
+in your DNS zone publication tool chain, please consult the
+.I README
+file included in the distribution.
+.SH AUTHOR
+Roland van Rijswijk-Deij <roland.vanrijswijk@surfnet.nl>
+.SH COPYRIGHT
+Copyright (c) 2013 SURFnet bv, all rights reserved.
+.P
+Subject to a 3-clause BSD license specified in the LICENSE file included
+in the distribution.
