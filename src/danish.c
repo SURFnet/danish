@@ -39,7 +39,7 @@ void show_usage(void)
 	printf("usage:\n");
 	printf("\tdanish -n <hostname> -c <certfile> [-e] [-m] [-r <certreq>]\n");
 	printf("\t       -p <port> -P <tcp | udp> [-u <0-3>] [-s <0,1>] [-m <1,2>]\n");
-	printf("\t       [-q]\n");
+	printf("\t       [-t] [-q]\n");
 	printf("\n");
 	printf("\tdanish -h\n");
 	printf("\n");
@@ -66,6 +66,7 @@ void show_usage(void)
 	printf("\t                  0 - unsupported by danish\n");
 	printf("\t                  1 - SHA256 hash (default)\n");
 	printf("\t                  2 - SHA512 hash\n");
+	printf("\t-t            Use TYPE52 as record type instead of TLSA\n");
 	printf("\t-q            be quiet (suppress output from the checks that are\n");
 	printf("\t              executed and only output the TLSA record)\n");
 	printf("\n");
@@ -95,12 +96,13 @@ int main(int argc, char* argv[])
 	int proto_sel	= -1;
 	int port		= 0;
 	int rv			= 0;
+	int use_type52	= 0;
 	int be_quiet	= 0;
 	
 	cert_ctx 		crt = { 0 };
 	req_ctx			req = { 0 };
 	
-	while ((c = getopt(argc, argv, "n:c:eMr:u:s:m:p:P:qhv")) != -1)
+	while ((c = getopt(argc, argv, "n:c:eMr:u:s:m:p:P:tqhv")) != -1)
 	{
 		switch(c)
 		{
@@ -173,6 +175,9 @@ int main(int argc, char* argv[])
 				
 				par_error = 1;
 			}
+			break;
+		case 't':
+			use_type52 = 1;
 			break;
 		case 'q':
 			be_quiet = 1;
@@ -269,10 +274,11 @@ int main(int argc, char* argv[])
 	}
 	
 	/* Output the TLSA record */
-	printf("_%d._%s.%s.\tIN\tTLSA\t%d %d %d %s\n",
+	printf("_%d._%s.%s.\tIN\t%s\t%d %d %d %s\n",
 		port,
 		proto[proto_sel],
 		hostname,
+		use_type52 ? "TYPE52" : "TLSA",
 		usage,
 		selector,
 		match_type,
