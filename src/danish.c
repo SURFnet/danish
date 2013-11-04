@@ -274,16 +274,31 @@ int main(int argc, char* argv[])
 	}
 	
 	/* Output the TLSA record */
-	printf("_%d._%s.%s.\tIN\t%s\t%d %d %d %s\n",
-		port,
-		proto[proto_sel],
-		hostname,
-		use_type52 ? "TYPE52" : "TLSA",
-		usage,
-		selector,
-		match_type,
-		(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
-		                    cert_get_sha512_hash(&crt, selector));
+	if (use_type52)
+	{
+		printf("_%d._%s.%s.\tIN\tTYPE52\t\\# %d %02X%02X%02X%s\n",
+			port,
+			proto[proto_sel],
+			hostname,
+			(match_type == 1) ? 35 : 67,
+			usage,
+			selector,
+			match_type,
+			(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
+			                    cert_get_sha512_hash(&crt, selector));
+	}
+	else
+	{
+		printf("_%d._%s.%s.\tIN\tTLSA\t%d %d %d %s\n",
+			port,
+			proto[proto_sel],
+			hostname,
+			usage,
+			selector,
+			match_type,
+			(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
+			                    cert_get_sha512_hash(&crt, selector));
+	}
 		                    
 	/* Perform expiration check if requested */
 	if (check_exp)
