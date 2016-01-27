@@ -17,9 +17,8 @@ define([PACKAGE_SUFFIX], [])
 AC_PREREQ(2.61)
 AC_INIT([danish],[DANISH_VERSION_MAJOR.DANISH_VERSION_MINOR.DANISH_VERSION_BUILDREV[]PACKAGE_SUFFIX])
 AC_CONFIG_HEADER([config.h])
-AC_CONFIG_SRCDIR([src/Makefile.am])
 AC_CONFIG_MACRO_DIR([m4])
-AM_INIT_AUTOMAKE(foreign)
+AM_INIT_AUTOMAKE(foreign subdir-objects)
 ACX_PREFIXHACK
 
 # Checks for compilers and other programs
@@ -69,8 +68,6 @@ AC_PROG_INSTALL
 # Generate the makefiles
 AC_CONFIG_FILES([
 	Makefile
-	src/Makefile
-	man/Makefile
 ])
 
 AC_OUTPUT
