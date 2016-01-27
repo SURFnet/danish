@@ -1,4 +1,4 @@
-.\" Copyright (c) 2013 SURFnet bv
+.\" Copyright (c) 2013-2016 SURFnet bv
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -25,15 +25,22 @@
 .\" OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 .\" IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.TH DANISH 1 "August 2013" "Roland van Rijswijk-Deij" "Internet / DNS"
+.TH DANISH 1 "January 2016" "Roland van Rijswijk-Deij" "Internet / DNS"
 .SH NAME
-danish \- generate TLSA records and check X.509 certificate information
+danish \- generate TLSA or SMIMEA records and check X.509 certificate information
 .SH SYNOPSIS
 .B danish -n 
 .I hostname
 .B -c 
 .I certfile
-.B [-e] [-m] [-r 
+.B [-H] [-e] [-t] [-q] [-M]
+.B -u 
+.I 0-3
+.B -s
+.I 0-1
+.B -m
+.I 1-2
+.B [-r
 .I reqfile
 .B ] -p 
 .I port
@@ -41,13 +48,20 @@ danish \- generate TLSA records and check X.509 certificate information
 .I tcp
 .B | 
 .I udp
+
+.B danish -n
+.I hostname
+.B -c
+.I certfile
+.B -E
+.I emailAddress
+.B [-e] [-t] [-q] [-M]
 .B -u 
 .I 0-3
 .B -s
 .I 0-1
 .B -m
 .I 1-2
-.B -q
 
 .B danish -h
 
@@ -56,7 +70,9 @@ danish \- generate TLSA records and check X.509 certificate information
 .B danish
 generates TLSA records compliant with
 .I RFC 6698
-from X.509 certificates. In addition to generating TLSA records
+or SMIMEA records compliant with
+.I draft-ietf-dane-smime-09
+from X.509 certificates. In addition to generating TLSA or SMIMEA records
 .B danish
 can also perform a number of checks on certificates and outputs the
 status of these checks, both as text as well as a return value that can
@@ -72,14 +88,20 @@ Read the X.509 certificate from
 .IP "[-e]"
 Check if the certificate is valid or has expired; uses the current
 system time.
-.IP "[-m]"
+.IP "[-M]"
 Match the
-.I hostname
+.I hostname or mailAddress
 specified with the
 .B -n
+or
+.B -E
 option against the subject and the subjectAltName of the certificate to
 check if the certificate is valid for the specified
 .I hostname
+or
+.I mailAddress
+.IP "[-H]"
+Generate a TLSA record for a hostname (default behaviour).
 .IP "-r reqfile"
 Matches the X.509 certificate against the certificate signing request
 (CSR) read from
@@ -94,6 +116,10 @@ to which the TLSA record that will be generated pertains
 .IP "-P tcp | udp"
 Specifies the protocol (TCP or UDP) to which the TLSA record that will
 be generated pertains
+.IP "-E mailAddress"
+Generate an SMIMEA record for
+.I mailAddress
+; if usage 0 (CA constraint) or 2 (trust anchor) is specified, the actual e-mail address specified will be ignored and a wildcard record will be generated instead.
 .IP "-u 0-3"
 Specifies the TLSA record certificate usage (see RFC 6698, section 2.1.1);
 valid uses are:
@@ -185,12 +211,12 @@ Output version information
 For more information on how to integrate
 .B danish
 in your DNS zone publication tool chain, please consult the
-.I README
+.I README.md
 file included in the distribution.
 .SH AUTHOR
 Roland van Rijswijk-Deij <roland.vanrijswijk@surfnet.nl>
 .SH COPYRIGHT
-Copyright (c) 2013 SURFnet bv, all rights reserved.
+Copyright (c) 2013-2016 SURFnet bv, all rights reserved.
 .P
 Subject to a 3-clause BSD license specified in the LICENSE file included
 in the distribution.
