@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 SURFnet bv
+ * Copyright (c) 2013-2016 SURFnet bv
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <ctype.h>
 
 void init_cert_ctx(cert_ctx* ctx)
 {
@@ -226,6 +227,38 @@ const char* cert_get_sha512_hash(const cert_ctx* ctx, const int selector)
 	return hash_str;
 }
 
+const char* mail_get_smimea_sha256_hash(const char* mailAddress)
+{
+	assert(mailAddress != NULL);
+	assert(strlen(mailAddress) < 512);
+
+	static char	hash_str[57]	= { 0 };
+	EVP_MD_CTX	hash_ctx;
+	unsigned char	hash[32]	= { 0 };
+	unsigned int	hash_len	= 32;
+	size_t		i		= 0;
+	char		lowerMail[512]	= { 0 };
+
+	/* Canonicalize to lower case and cut at the '@' sign */
+	for (i = 0; i < strlen(mailAddress); i++)
+	{
+		if (mailAddress[i] == '@') break;
+
+		lowerMail[i] = tolower(mailAddress[i]);
+	}
+
+	EVP_DigestInit(&hash_ctx, EVP_sha256());
+	EVP_DigestUpdate(&hash_ctx, lowerMail, strlen(lowerMail));
+	EVP_DigestFinal(&hash_ctx, hash, &hash_len);
+
+	for (i = 0; i < 28; i++)
+	{
+		sprintf(&hash_str[i*2], "%02x", hash[i]);
+	}
+	
+	return hash_str;
+}
+
 int cert_is_valid(const cert_ctx* ctx, int be_quiet)
 {
 	assert(ctx != NULL);
@@ -267,17 +300,17 @@ int compare_names(const char* left, const char* right)
 	assert(left != NULL);
 	assert(right != NULL);
 	
-	const char* 	left_copy 			= left;
-	const char* 	right_copy			= right;
-	char*			left_worker			= NULL;
-	char*			right_worker		= NULL;
-	char* 			left_token			= NULL;
-	char*			right_token			= NULL;
-	char*			left_saveptr		= NULL;
-	char*			right_saveptr		= NULL;
-	size_t			left_dots			= 0;
-	size_t			right_dots			= 0;
-	int				rv					= 0;
+	const char* 	left_copy 	= left;
+	const char* 	right_copy	= right;
+	char*		left_worker	= NULL;
+	char*		right_worker	= NULL;
+	char* 		left_token	= NULL;
+	char*		right_token	= NULL;
+	char*		left_saveptr	= NULL;
+	char*		right_saveptr	= NULL;
+	size_t		left_dots	= 0;
+	size_t		right_dots	= 0;
+	int		rv		= 0;
 	
 	/* Count the number of dots in both strings */
 	while((left_copy = strchr(left_copy, '.')) != NULL)
@@ -336,14 +369,14 @@ int compare_names(const char* left, const char* right)
 
 typedef struct x509_utf8_name_list_entry
 {
-	char*								utf8_name;
+	char*					utf8_name;
 	struct x509_utf8_name_list_entry* 	next;
 }
 x509_utf8_name_list_entry;
 
 void x509_utf8_name_list_append(x509_utf8_name_list_entry** list, char* utf8_name)
 {
-	x509_utf8_name_list_entry* iter			= *list;
+	x509_utf8_name_list_entry* iter		= *list;
 	x509_utf8_name_list_entry* new_entry 	= NULL;
 	
 	new_entry = (x509_utf8_name_list_entry*) malloc(sizeof(x509_utf8_name_list_entry));
@@ -400,11 +433,10 @@ x509_utf8_name_list_entry* get_subject_cn(const cert_ctx* ctx)
 {
 	assert(ctx != NULL);
 	
-	x509_utf8_name_list_entry* rv = NULL;
-	
-	X509_NAME* 			subject				= NULL;
-	X509_NAME_ENTRY*	subject_component	= NULL;
-	int					pos					= 0;
+	x509_utf8_name_list_entry*	rv			= NULL;
+	X509_NAME* 			subject			= NULL;
+	X509_NAME_ENTRY*		subject_component	= NULL;
+	int				pos			= 0;
 	
 	subject = X509_get_subject_name(ctx->ossl_crt);
 	
@@ -419,8 +451,8 @@ x509_utf8_name_list_entry* get_subject_cn(const cert_ctx* ctx)
 		
 		if (subject_component != NULL)
 		{
-			ASN1_STRING* 				subject_cn	= X509_NAME_ENTRY_get_data(subject_component);
-			char*						utf8_name   = NULL;
+			ASN1_STRING* 	subject_cn	= X509_NAME_ENTRY_get_data(subject_component);
+			char*		utf8_name	= NULL;
 			
 			if (ASN1_STRING_to_UTF8((unsigned char**) &utf8_name, subject_cn) > 0)
 			{
@@ -432,14 +464,49 @@ x509_utf8_name_list_entry* get_subject_cn(const cert_ctx* ctx)
 	return rv;
 }
 
-x509_utf8_name_list_entry* get_subject_alt_names(const cert_ctx* ctx)
+x509_utf8_name_list_entry* get_subject_mailaddrs(const cert_ctx* ctx)
 {
 	assert(ctx != NULL);
 	
-	GENERAL_NAME*				subject_alt_name_component	= NULL;
-	STACK_OF(GENERAL_NAME)*		subject_alt_name			= NULL;
-	x509_utf8_name_list_entry*	rv							= NULL;
-	int 						i							= 0;
+	x509_utf8_name_list_entry*	rv			= NULL;
+	X509_NAME* 			subject			= NULL;
+	X509_NAME_ENTRY*		subject_component	= NULL;
+	int				pos			= 0;
+	
+	subject = X509_get_subject_name(ctx->ossl_crt);
+	
+	if (subject == NULL)
+	{
+		return NULL;
+	}
+	
+	while ((pos = X509_NAME_get_index_by_NID(subject, NID_pkcs9_emailAddress, pos)) != -1)
+	{
+		subject_component = X509_NAME_get_entry(subject, pos);
+		
+		if (subject_component != NULL)
+		{
+			ASN1_STRING* 	subject_cn	= X509_NAME_ENTRY_get_data(subject_component);
+			char*		utf8_name	= NULL;
+			
+			if (ASN1_STRING_to_UTF8((unsigned char**) &utf8_name, subject_cn) > 0)
+			{
+				x509_utf8_name_list_append(&rv, utf8_name);
+			}
+		}
+	}
+	
+	return rv;
+}
+
+x509_utf8_name_list_entry* get_subject_alt_names(const cert_ctx* ctx, const int type)
+{
+	assert(ctx != NULL);
+	
+	GENERAL_NAME*			subject_alt_name_component	= NULL;
+	STACK_OF(GENERAL_NAME)*		subject_alt_name		= NULL;
+	x509_utf8_name_list_entry*	rv				= NULL;
+	int 				i				= 0;
 	
 	subject_alt_name = (STACK_OF(GENERAL_NAME)*) X509_get_ext_d2i(ctx->ossl_crt, NID_subject_alt_name, NULL, NULL);
 	
@@ -452,13 +519,13 @@ x509_utf8_name_list_entry* get_subject_alt_names(const cert_ctx* ctx)
 	{
 		subject_alt_name_component = sk_GENERAL_NAME_value(subject_alt_name, i);
 		
-		if (subject_alt_name_component->type == GEN_DNS)
+		if (subject_alt_name_component->type == type)
 		{
-			char* dns_name_utf8 = NULL;
+			char* name_utf8 = NULL;
 			
-			if (ASN1_STRING_to_UTF8((unsigned char**) &dns_name_utf8, subject_alt_name_component->d.uniformResourceIdentifier) > 0)
+			if (ASN1_STRING_to_UTF8((unsigned char**) &name_utf8, subject_alt_name_component->d.uniformResourceIdentifier) > 0)
 			{
-				x509_utf8_name_list_append(&rv, dns_name_utf8);
+				x509_utf8_name_list_append(&rv, name_utf8);
 			}
 		}
 	}
@@ -474,8 +541,8 @@ int name_matches_subject_cn(const cert_ctx* ctx, const char* name)
 	assert(name != NULL);
 	
 	x509_utf8_name_list_entry* 	common_names	= NULL;
-	x509_utf8_name_list_entry* 	iter			= NULL;
-	int							rv				= -2;
+	x509_utf8_name_list_entry* 	iter		= NULL;
+	int				rv		= -2;
 	
 	iter = common_names = get_subject_cn(ctx);
 	
@@ -497,10 +564,10 @@ int name_matches_subject_alt_name(const cert_ctx* ctx, const char* name)
 	assert(name != NULL);
 	
 	x509_utf8_name_list_entry*	subject_alt_names	= NULL;
-	x509_utf8_name_list_entry*	iter				= NULL;
-	int							rv					= -2;
+	x509_utf8_name_list_entry*	iter			= NULL;
+	int				rv			= -2;
 	
-	iter = subject_alt_names = get_subject_alt_names(ctx);
+	iter = subject_alt_names = get_subject_alt_names(ctx, GEN_DNS);
 	
 	while (iter && (rv != 0))
 	{
@@ -547,26 +614,102 @@ int cert_matches_name(const cert_ctx* ctx, const char* name, int be_quiet)
 	return CERT_NAME_MISMATCH;
 }
 
+int addr_matches_subject_mailaddrs(const cert_ctx* ctx, const char* mailaddr)
+{
+	assert(ctx != NULL);
+	assert(mailaddr != NULL);
+	
+	x509_utf8_name_list_entry* 	mailaddrs	= NULL;
+	x509_utf8_name_list_entry* 	iter		= NULL;
+	int				rv		= -2;
+	
+	iter = mailaddrs = get_subject_mailaddrs(ctx);
+	
+	while (iter && (rv != 0))
+	{
+		rv = strcasecmp(iter->utf8_name, mailaddr);
+		
+		iter = iter->next;
+	}
+	
+	x509_utf8_name_list_free(mailaddrs);
+	
+	return rv;
+}
+
+int addr_matches_subject_alt_name(const cert_ctx* ctx, const char* mailaddr)
+{
+	assert(ctx != NULL);
+	assert(mailaddr != NULL);
+	
+	x509_utf8_name_list_entry*	subject_alt_names	= NULL;
+	x509_utf8_name_list_entry*	iter			= NULL;
+	int				rv			= -2;
+	
+	iter = subject_alt_names = get_subject_alt_names(ctx, GEN_EMAIL);
+	
+	while (iter && (rv != 0))
+	{
+		rv = strcasecmp(iter->utf8_name, mailaddr);
+		
+		iter = iter->next;
+	}
+	
+	x509_utf8_name_list_free(subject_alt_names);
+	
+	return rv;
+}
+
+int cert_matches_mailaddr(const cert_ctx* ctx, const char* mailaddr, int be_quiet)
+{
+	assert(ctx != NULL);
+	assert(mailaddr != NULL);
+	
+	if (addr_matches_subject_mailaddrs(ctx, mailaddr) == 0)
+	{
+		if (!be_quiet)
+		{
+			printf("E-mail address matches certificate subject\n");
+		}
+		
+		return 0;
+	}
+	
+	if (addr_matches_subject_alt_name(ctx, mailaddr) == 0)
+	{
+		if (!be_quiet)
+		{
+			printf("E-mail address matches certificate subjectAltName\n");
+		}
+		
+		return 0;
+	}
+	
+	if (!be_quiet)
+	{
+		printf("E-mail address does not match certificate subject or subjectAltName\n");
+	}
+	
+	return CERT_ADDR_MISMATCH;
+}
+
 int cert_matches_req(const cert_ctx* cert, const req_ctx* req, int be_quiet)
 {
 	assert(cert != NULL);
 	assert(req != NULL);
 	
 	x509_utf8_name_list_entry*	cert_common_names 		= get_subject_cn(cert);
-	x509_utf8_name_list_entry*	cert_subject_alt_names	= get_subject_alt_names(cert);
-	
-	X509_NAME* 					subject						= NULL;
-	X509_NAME_ENTRY*			subject_component			= NULL;
-	int							pos							= 0;
-	
-	STACK_OF(X509_EXTENSION)*	extensions					= NULL;
-	GENERAL_NAME*				subject_alt_name_component	= NULL;
-	STACK_OF(GENERAL_NAME)*		subject_alt_name			= NULL;
-	int 						i							= 0;
-	int							rv							= 0;
-	
-	EVP_PKEY*					cert_pubkey					= X509_get_pubkey(cert->ossl_crt);
-	EVP_PKEY*					req_pubkey					= X509_REQ_get_pubkey(req->ossl_req);
+	x509_utf8_name_list_entry*	cert_subject_alt_names		= get_subject_alt_names(cert, GEN_DNS);
+	X509_NAME* 			subject				= NULL;
+	X509_NAME_ENTRY*		subject_component		= NULL;
+	int				pos				= 0;
+	STACK_OF(X509_EXTENSION)*	extensions			= NULL;
+	GENERAL_NAME*			subject_alt_name_component	= NULL;
+	STACK_OF(GENERAL_NAME)*		subject_alt_name		= NULL;
+	int 				i				= 0;
+	int				rv				= 0;
+	EVP_PKEY*			cert_pubkey			= X509_get_pubkey(cert->ossl_crt);
+	EVP_PKEY*			req_pubkey			= X509_REQ_get_pubkey(req->ossl_req);
 	
 	/* Match subject CNs */
 	subject = X509_REQ_get_subject_name(req->ossl_req);
@@ -582,8 +725,8 @@ int cert_matches_req(const cert_ctx* cert, const req_ctx* req, int be_quiet)
 		
 		if (subject_component != NULL)
 		{
-			ASN1_STRING* 				subject_cn	= X509_NAME_ENTRY_get_data(subject_component);
-			char*						utf8_name   = NULL;
+			ASN1_STRING* 	subject_cn	= X509_NAME_ENTRY_get_data(subject_component);
+			char*		utf8_name	= NULL;
 			
 			if (ASN1_STRING_to_UTF8((unsigned char**) &utf8_name, subject_cn) > 0)
 			{
@@ -620,7 +763,7 @@ int cert_matches_req(const cert_ctx* cert, const req_ctx* req, int be_quiet)
 		if (cert_subject_alt_names != NULL)
 		{
 			x509_utf8_name_list_entry* 	csr_subject_alt_names 	= NULL;
-			x509_utf8_name_list_entry* 	iter					= NULL;
+			x509_utf8_name_list_entry* 	iter			= NULL;
 			
 			subject_alt_name = (STACK_OF(GENERAL_NAME)*) X509V3_EXT_d2i(X509v3_get_ext(extensions, pos));
 			

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 SURFnet bv
+ * Copyright (c) 2013-2016 SURFnet bv
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,6 +35,7 @@
 #define CERT_NOT_VALID		0x00000001
 #define CERT_NAME_MISMATCH	0x00000002
 #define CERT_CSR_MISMATCH	0x00000004
+#define CERT_ADDR_MISMATCH	0x00000008
 #define CERT_FATAL_ERROR	0x80000000
 
 typedef struct
@@ -65,9 +66,13 @@ const char* cert_get_sha256_hash(const cert_ctx* ctx, const int selector);
 
 const char* cert_get_sha512_hash(const cert_ctx* ctx, const int selector);
 
+const char* mail_get_smimea_sha256_hash(const char* mailAddress);
+
 int cert_is_valid(const cert_ctx* ctx, int be_quiet);
 
 int cert_matches_name(const cert_ctx* ctx, const char* name, int be_quiet);
+
+int cert_matches_mailaddr(const cert_ctx* ctx, const char* mailaddr, int be_quiet);
 
 int cert_matches_req(const cert_ctx* cert, const req_ctx* req, int be_quiet);
 

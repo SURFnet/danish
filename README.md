@@ -1,4 +1,4 @@
-Copyright (c) 2013 SURFnet bv
+Copyright (c) 2013-2016 SURFnet bv
 
 All rights reserved. This software is distributed under a BSD-style
 license. For more information, see LICENSE
@@ -13,14 +13,17 @@ that can be used to store information about relating to the certificate
 used to secure TLS connections to a specific service on a host.
 
 To make optimal use of this new facility, the danish tool helps users
-by generating TLSA records and by checking certain properties of
+by generating TLSA or SMIMEA records and by checking certain properties of
 certificates. The tool was specifically designed to be integrated into
 an automated DNS zone generation chain. Apart from being able to
-generate TLSA records from X.509 certificates danish is also able to:
+generate TLSA and SMIMEA records from X.509 certificates danish is also 
+able to:
 
  - Check if a certificate has expired
  - Check if the hostname for which a TLSA record is created matches
    with the certificate
+ - Check if the e-mail address for which an SMIMEA record is created
+   matches with the certificate
  - Check if a certificate matches with the certificate signing request
    (CSR) used to to request the certificate from a certificate
    authority
@@ -69,13 +72,13 @@ tool chain in mind. To this end, it can run certain checks on the
 certificates for which it generates TLSA records. Depending on which
 checks were run and the outcome of those checks, danish will set its 
 exit status. This can be used to make decisions about whether or not to
-include a TLSA record in a DNS zone. The danish tool supports 3 checks
+include a TLSA record in a DNS zone. The danish tool supports 4 checks
 listed in section 1 of this README document.
 
 Depending on the outcome of these checks danish may return a combination
 of one or more of the following exit status values:
 
- - CERT_NOT_VALID 		(0x00000001)
+ - CERT_NOT_VALID 	(0x00000001)
    This exit status is set if the certificate has expired
  - CERT_NAME_MISMATCH 	(0x00000002)
    This exit status is set if the hostname for which the TLSA record
@@ -84,7 +87,11 @@ of one or more of the following exit status values:
  - CERT_CSR_MISMATCH	(0x00000004)
    This exit status is set if the certificate does not match the
    certificate signing request specified on the command-line
- - CERT_FATAL_ERROR		(0x80000000)
+ - CERT_ADDR_MISMATCH	(0x00000008)
+   This exit status if set if the specified e-mail address for which the
+   SMIMEA record is created does not match any of the e-mail addresses
+   in the subject or subjectAltName of the certificate
+ - CERT_FATAL_ERROR	(0x80000000)
    This exit status is set if danish encountered a blocking issue while
    checking the certificate or generating the TLSA record
    

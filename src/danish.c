@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 SURFnet bv
+ * Copyright (c) 2013-2016 SURFnet bv
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,38 +37,49 @@
 void show_usage(void)
 {
 	printf("usage:\n");
-	printf("\tdanish -n <hostname> -c <certfile> [-e] [-m] [-r <certreq>]\n");
-	printf("\t       -p <port> -P <tcp | udp> [-u <0-3>] [-s <0,1>] [-m <1,2>]\n");
-	printf("\t       [-t] [-q]\n");
+	printf("\tdanish -n <hostname> -c <certfile> [-H] [-e] [-t] [-q] [-M]\n");
+	printf("\t       [-r <certreq>] -p <port> -P <tcp | udp>\n");
+	printf("\t       [-u <0-3>] [-s <0,1>] [-m <1,2>]\n");
+	printf("\n");
+	printf("\tdanish -n <hostname> -c <certfile> -E <emailAddress>\n");
+	printf("\t       [-e] [-t] [-q] [-M] [-u <0-3>] [-s <0,1>] [-m <1,2>]\n");
 	printf("\n");
 	printf("\tdanish -h\n");
 	printf("\n");
 	printf("\tdanish -v\n");
 	printf("\n");
-	printf("\t-n <hostname> generate TLSA record for <hostname>\n");
 	printf("\t-c <certfile> use the X.509 certificate in <certfile>\n");
 	printf("\t-e            check certificate expiration\n");
-	printf("\t-M            check if the certificate matches <hostname>\n");
-	printf("\t-r <reqfile>  check if the certificate matches the certificate\n");
-	printf("\t              request in <reqfile>\n");
-	printf("\t-p            specify the TLS service port\n");
-	printf("\t-P            specify the protocol (udp or tcp)\n");
-	printf("\t-u <0-3>      RFC 6698 certificate usage; can be:\n");
+	printf("\t-q            be quiet (suppress output from the checks that are\n");
+	printf("\t              executed and only output the generated record)\n");
+	printf("\t-t            Use TYPExx as record type instead of TLSA or SMIMEA\n");
+	printf("\t-u <0-3>      Certificate usage; can be:\n");
 	printf("\t                  0 - CA constraint\n");
 	printf("\t                  1 - certificate constraint with PKIX validation\n");
 	printf("\t                      (default)\n");
 	printf("\t                  2 - trust anchor\n");
 	printf("\t                  3 - self-signed certificate\n");
-	printf("\t-s <0,1>      RFC 6698 selector; can be:\n");
+	printf("\t-s <0,1>      Selector; can be:\n");
 	printf("\t                  0 - full certificate (default)\n");
 	printf("\t                  1 - subjectPublicKeyInfo\n");
-	printf("\t-m <1,2>      RFC 6698 matching type; can be:\n");
+	printf("\t-m <1,2>      Matching type; can be:\n");
 	printf("\t                  0 - unsupported by danish\n");
 	printf("\t                  1 - SHA256 hash (default)\n");
 	printf("\t                  2 - SHA512 hash\n");
-	printf("\t-t            Use TYPE52 as record type instead of TLSA\n");
-	printf("\t-q            be quiet (suppress output from the checks that are\n");
-	printf("\t              executed and only output the TLSA record)\n");
+	printf("\n");
+	printf("\nUsage for TLSA records:\n");
+	printf("\t-H            generate a TLSA record for a host\n");
+	printf("\t              (default behaviour)");
+	printf("\t-n <hostname> generate TLSA record for <hostname>\n");
+	printf("\t-M            check if the certificate matches <hostname>\n");
+	printf("\t-r <reqfile>  check if the certificate matches the certificate\n");
+	printf("\t              request in <reqfile>\n");
+	printf("\t-p            specify the TLS service port\n");
+	printf("\t-P            specify the protocol (udp or tcp)\n");
+	printf("\nUsage for SMIMEA records:\n");
+	printf("\t-E <address>  generate an SMIMEA record for <emailAddress>\n");
+	printf("\t-n <hostname> use <hostname> as base name for the SMIMEA record\n");
+	printf("\t-M            check if the certificate matches <emailAddress>\n");
 	printf("\n");
 	printf("\t-h            print this help message\n");
 	printf("\n");
@@ -77,32 +88,35 @@ void show_usage(void)
 
 void show_version(void)
 {
-	printf("sigvalcheck version %s\n", VERSION);
+	printf("danish version %s\n", VERSION);
 }
 
 int main(int argc, char* argv[])
 {
-	char* hostname	= NULL;
-	char* certfile	= NULL;
-	char* reqfile	= NULL;
-	int check_exp	= 0;
-	int match_name	= 0;
-	int usage		= 1;
-	int selector	= 0;
-	int match_type	= 1;
-	int c			= 0;
-	int par_error   = 0;
-	char* proto[2]	= { "tcp", "udp" };
-	int proto_sel	= -1;
-	int port		= 0;
-	int rv			= 0;
-	int use_type52	= 0;
-	int be_quiet	= 0;
+	char* 	hostname	= NULL;
+	char* 	certfile	= NULL;
+	char* 	reqfile		= NULL;
+	int 	check_exp	= 0;
+	int 	match_subject	= 0;
+	int 	usage		= 1;
+	int 	selector	= 0;
+	int 	match_type	= 1;
+	int	 c		= 0;
+	int 	par_error  	= 0;
+	char* 	proto[2]	= { "tcp", "udp" };
+	int 	proto_sel	= -1;
+	int 	port		= 0;
+	int 	rv		= 0;
+	int 	use_typeXX	= 0;
+	int 	be_quiet	= 0;
+	char*	mailAddress	= NULL;
+	int 	do_tlsa		= 1;
+	int 	do_smimea	= 0;
 	
-	cert_ctx 		crt = { 0 };
-	req_ctx			req = { 0 };
+	cert_ctx	crt	= { 0 };
+	req_ctx		req	= { 0 };
 	
-	while ((c = getopt(argc, argv, "n:c:eMr:u:s:m:p:P:tqhv")) != -1)
+	while ((c = getopt(argc, argv, "HE:n:c:eMr:u:s:m:p:P:tqhv")) != -1)
 	{
 		switch(c)
 		{
@@ -125,7 +139,7 @@ int main(int argc, char* argv[])
 			check_exp = 1;
 			break;
 		case 'M':
-			match_name = 1;
+			match_subject = 1;
 			break;
 		case 'u':
 			usage = atoi(optarg);
@@ -177,10 +191,19 @@ int main(int argc, char* argv[])
 			}
 			break;
 		case 't':
-			use_type52 = 1;
+			use_typeXX = 1;
 			break;
 		case 'q':
 			be_quiet = 1;
+			break;
+		case 'H':
+			do_tlsa = 1;
+			break;
+		case 'E':
+			do_smimea = 1;
+			do_tlsa = 0;
+
+			mailAddress = strdup(optarg);
 			break;
 		default:
 			break;
@@ -188,7 +211,7 @@ int main(int argc, char* argv[])
 	}
 	
 	/* Check parameters */
-	if (!hostname)
+	if (do_tlsa && !hostname)
 	{
 		fprintf(stderr, "Mandatory parameter -n <hostname> missing!\n\n");
 		
@@ -223,17 +246,24 @@ int main(int argc, char* argv[])
 		par_error = 1;
 	}
 	
-	if ((port < 1) || (port > 65535))
+	if (do_tlsa && ((port < 1) || (port > 65535)))
 	{
 		fprintf(stderr, "Invalid (%d) or no port specified!\n\n", port);
 		
 		par_error = 1;
 	}
 	
-	if (proto_sel == -1)
+	if (do_tlsa && (proto_sel == -1))
 	{
 		fprintf(stderr, "No protocol specified!\n\n");
 		
+		par_error = 1;
+	}
+
+	if (do_tlsa && do_smimea)
+	{
+		fprintf(stderr, "Must select one of -H or -E [...]\n\n");
+
 		par_error = 1;
 	}
 	
@@ -244,6 +274,7 @@ int main(int argc, char* argv[])
 		free(hostname);
 		free(certfile);
 		free(reqfile);
+		free(mailAddress);
 		
 		return -1;
 	}
@@ -259,63 +290,128 @@ int main(int argc, char* argv[])
 		
 		return -1;
 	}
-	
-	/* Load the certificate request if necessary */
-	init_req_ctx(&req);
-	
-	if (reqfile)
+
+	if (do_tlsa)
 	{
-		if (read_req(&req, reqfile) != 0)
+		/* Load the certificate request if necessary */
+		init_req_ctx(&req);
+		
+		if (reqfile)
 		{
-			fprintf(stderr, "Failed to read CSR from %s\n", reqfile);
-			
-			return -1;
+			if (read_req(&req, reqfile) != 0)
+			{
+				fprintf(stderr, "Failed to read CSR from %s\n", reqfile);
+				
+				return -1;
+			}
+		}
+		
+		/* Output the TLSA record */
+		if (use_typeXX)
+		{
+			printf("_%d._%s.%s.\tIN\tTYPE52\t\\# %d %02X%02X%02X%s\n",
+				port,
+				proto[proto_sel],
+				hostname,
+				(match_type == 1) ? 35 : 67,
+				usage,
+				selector,
+				match_type,
+				(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
+				                    cert_get_sha512_hash(&crt, selector));
+		}
+		else
+		{
+			printf("_%d._%s.%s.\tIN\tTLSA\t%d %d %d %s\n",
+				port,
+				proto[proto_sel],
+				hostname,
+				usage,
+				selector,
+				match_type,
+				(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
+				                    cert_get_sha512_hash(&crt, selector));
+		}
+			                    
+		/* Perform expiration check if requested */
+		if (check_exp)
+		{
+			rv |= cert_is_valid(&crt, be_quiet);
+		}
+		
+		/* Perform name match check if requested */
+		if (match_subject)
+		{
+			rv |= cert_matches_name(&crt, hostname, be_quiet);
+		}
+		
+		if (reqfile != NULL)
+		{
+			/* Perform CSR match if requested */
+			rv |= cert_matches_req(&crt, &req, be_quiet);
 		}
 	}
-	
-	/* Output the TLSA record */
-	if (use_type52)
+	else if (do_smimea)
 	{
-		printf("_%d._%s.%s.\tIN\tTYPE52\t\\# %d %02X%02X%02X%s\n",
-			port,
-			proto[proto_sel],
-			hostname,
-			(match_type == 1) ? 35 : 67,
-			usage,
-			selector,
-			match_type,
-			(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
-			                    cert_get_sha512_hash(&crt, selector));
-	}
-	else
-	{
-		printf("_%d._%s.%s.\tIN\tTLSA\t%d %d %d %s\n",
-			port,
-			proto[proto_sel],
-			hostname,
-			usage,
-			selector,
-			match_type,
-			(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
-			                    cert_get_sha512_hash(&crt, selector));
-	}
-		                    
-	/* Perform expiration check if requested */
-	if (check_exp)
-	{
-		rv |= cert_is_valid(&crt, be_quiet);
-	}
-	
-	/* Perform name match check if requested */
-	if (match_name)
-	{
-		rv |= cert_matches_name(&crt, hostname, be_quiet);
-	}
-	
-	if (reqfile != NULL)
-	{
-		/* Perform CSR match if requested */
-		rv |= cert_matches_req(&crt, &req, be_quiet);
+		char	fqdn[1024]	= { 0 };
+
+		if (hostname != NULL)
+		{
+			if ((usage == 0) || (usage == 2))
+			{
+				snprintf(fqdn, 1024, "*._smimecert.%s.", hostname);
+			}
+			else
+			{
+				snprintf(fqdn, 1024, "%s._smimecert.%s.", mail_get_smimea_sha256_hash(mailAddress), hostname);
+			}
+		}
+		else
+		{
+			if ((usage == 0) || (usage == 2))
+			{
+				snprintf(fqdn, 1024, "*._smimecert");
+			}
+			else
+			{
+				snprintf(fqdn, 1024, "%s._smimecert", mail_get_smimea_sha256_hash(mailAddress));
+			}
+		}
+
+		/* Output the SMIMEA record */
+		if (use_typeXX)
+		{
+			printf("%s\tIN\tTYPE53\t\\# %d %02X%02X%02X%s\n",
+				fqdn,
+				(match_type == 1) ? 35 : 67,
+				usage,
+				selector,
+				match_type,
+				(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
+				                    cert_get_sha512_hash(&crt, selector));
+		}
+		else
+		{
+			printf("%s\tIN\tSMIMEA\t%d %d %d %s\n",
+				fqdn,
+				usage,
+				selector,
+				match_type,
+				(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
+				                    cert_get_sha512_hash(&crt, selector));
+		}
+
+		/* Perform expiration check if requested */
+		if (check_exp)
+		{
+			rv |= cert_is_valid(&crt, be_quiet);
+		}
+		
+		/* Perform name match check if requested */
+		if (match_subject)
+		{
+			rv |= cert_matches_mailaddr(&crt, mailAddress, be_quiet);
+		}
 	}
 	
 	free_cert_ctx(&crt);
