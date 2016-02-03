@@ -39,7 +39,7 @@ danish \- generate TLSA or SMIMEA records and check X.509 certificate informatio
 .B -s
 .I 0-1
 .B -m
-.I 1-2
+.I 0-2
 .B [-r
 .I reqfile
 .B ] -p 
@@ -49,9 +49,7 @@ danish \- generate TLSA or SMIMEA records and check X.509 certificate informatio
 .B | 
 .I udp
 
-.B danish -n
-.I hostname
-.B -c
+.B danish -c
 .I certfile
 .B -E
 .I emailAddress
@@ -61,7 +59,7 @@ danish \- generate TLSA or SMIMEA records and check X.509 certificate informatio
 .B -s
 .I 0-1
 .B -m
-.I 1-2
+.I 0-2
 
 .B danish -h
 
@@ -183,9 +181,13 @@ on
 .I port
 must match the TLSA record.
 .RE
-.IP "-m 1-2"
+.IP "-m 0-2"
 Specifies the TLSA record matching type field (see RFC 6698, section
 2.1.3); valid matching field values are:
+.RS
+.P
+0 - full DER encoding of certificate or subjectPublicKeyInfo
+.RE
 .RS
 .P
 1 - SHA256 hash of the content selected using the
@@ -207,6 +209,11 @@ Print a short help summary of the options supported by
 .B danish
 .IP "-v"
 Output version information
+.SH DEFAULTS
+The default usage, selector and matching values for TLSA are
+.B 1 0 1
+and for SMIMEA are
+.B 1 0 0
 .SH INTEGRATING WITH ZONE PUBLICATION TOOL CHAIN
 For more information on how to integrate
 .B danish

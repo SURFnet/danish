@@ -41,7 +41,7 @@ void show_usage(void)
 	printf("\t       [-r <certreq>] -p <port> -P <tcp | udp>\n");
 	printf("\t       [-u <0-3>] [-s <0,1>] [-m <0-2>]\n");
 	printf("\n");
-	printf("\tdanish -n <hostname> -c <certfile> -E <emailAddress>\n");
+	printf("\tdanish -c <certfile> -E <emailAddress>\n");
 	printf("\t       [-e] [-t] [-q] [-M] [-u <0-3>] [-s <0,1>] [-m <0-2>]\n");
 	printf("\n");
 	printf("\tdanish -h\n");
@@ -79,7 +79,8 @@ void show_usage(void)
 	printf("\t*Default usage,selector,matching for TLSA is 1 0 1\n");
 	printf("\nUsage for SMIMEA records:\n");
 	printf("\t-E <address>  generate an SMIMEA record for <emailAddress>\n");
-	printf("\t-n <hostname> use <hostname> as base name for the SMIMEA record\n");
+	printf("\t              (hostname is taken as the FQDN right from the\n");
+	printf("\t              @ delimiter in the address)\n");
 	printf("\t-M            check if the certificate matches <emailAddress>\n\n");
 	printf("\t*Default usage,selector,matching for SMIMEA is 1 0 0\n");
 	printf("\n");
@@ -216,6 +217,16 @@ int main(int argc, char* argv[])
 			def_match_type = 0;
 
 			mailAddress = strdup(optarg);
+
+			if (strchr(mailAddress, '@') == NULL)
+			{
+				fprintf(stderr, "Invalid e-mail address specified (%s)\n", optarg);
+
+				free(mailAddress);
+				mailAddress = NULL;
+
+				par_error = 1;
+			}
 			break;
 		default:
 			break;
@@ -388,6 +399,17 @@ int main(int argc, char* argv[])
 		char	fqdn[1024]	= { 0 };
 		char*	certAssocData	= NULL;
 
+		if (hostname == NULL)
+		{
+			hostname = strdup(strchr(mailAddress, '@') + 1);
+
+			if (strlen(hostname) == 0)
+			{
+				free(hostname);
+				hostname = NULL;
+			}
+		}
+
 		if (hostname != NULL)
 		{
 			if ((set_usage == 0) || (set_usage == 2))
@@ -464,6 +486,7 @@ int main(int argc, char* argv[])
 	free_req_ctx(&req);
 	
 	free(hostname);
+	free(mailAddress);
 	free(certfile);
 	free(reqfile);
 
