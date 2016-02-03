@@ -6,7 +6,7 @@
 
 define([DANISH_VERSION_MAJOR], [0])
 define([DANISH_VERSION_MINOR], [2])
-define([DANISH_VERSION_BUILDREV], [0])
+define([DANISH_VERSION_BUILDREV], esyscmd([sh -c "git rev-list --count HEAD|tr -d '\n'"]))
 define([PACKAGE_SUFFIX], [])
 
 ################################################################################
