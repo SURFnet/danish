@@ -170,17 +170,39 @@ void get_hash_input(const cert_ctx* crt, const int selector, unsigned char** buf
 	
 }
 
-const char* cert_get_sha256_hash(const cert_ctx* ctx, const int selector)
+char* cert_get_der_hexstr(const cert_ctx* ctx, const int selector)
+{
+	char*		rv		= NULL;
+	size_t		cert_data_len	= 0;
+	unsigned char*	cert_data	= NULL;
+	size_t		i		= 0;
+
+	/* Get the certificate or subjectPublicKeyInfo DER encoding */
+	get_hash_input(ctx, selector, &cert_data, &cert_data_len);
+
+	rv = (char*) malloc(((cert_data_len * 2) + 1 ) * sizeof(char));
+
+	for (i = 0; i < cert_data_len; i++)
+	{
+		sprintf(&rv[i*2], "%02X", cert_data[i]);
+	}
+
+	OPENSSL_free(cert_data);
+
+	return rv;
+}
+
+char* cert_get_sha256_hash(const cert_ctx* ctx, const int selector)
 {
 	assert(ctx != NULL);
 	
-	unsigned char* hash_data = NULL;
-	size_t hash_data_len = 0;
-	static char hash_str[65] = { 0 };	/* SHA256 = 64 hex digits + \0 */
-	EVP_MD_CTX hash_ctx;
-	unsigned char hash[32] = { 0 };		/* SHA256 = 32 bytes */
-	unsigned int hash_len = 32;
-	int i = 0;
+	unsigned char* 	hash_data	= NULL;
+	size_t		hash_data_len	= 0;
+	char*		hash_str	= (char*) malloc(65 * sizeof(char));	/* SHA256 = 64 hex digits + \0 */
+	EVP_MD_CTX	hash_ctx;
+	unsigned char	hash[32]	= { 0 };				/* SHA256 = 32 bytes */
+	unsigned int	hash_len	= 32;
+	int		i		= 0;
 	
 	get_hash_input(ctx, selector, &hash_data, &hash_data_len);
 	
@@ -199,17 +221,17 @@ const char* cert_get_sha256_hash(const cert_ctx* ctx, const int selector)
 	return hash_str;
 }
 
-const char* cert_get_sha512_hash(const cert_ctx* ctx, const int selector)
+char* cert_get_sha512_hash(const cert_ctx* ctx, const int selector)
 {
 	assert(ctx != NULL);
 	
-	unsigned char* hash_data = NULL;
-	size_t hash_data_len = 0;
-	static char hash_str[129] = { 0 };	/* SHA512 = 128 hex digits + \0 */
-	EVP_MD_CTX hash_ctx;
-	unsigned char hash[64] = { 0 };		/* SHA512 = 64 bytes */
-	unsigned int hash_len = 64;
-	int i = 0;
+	unsigned char*	hash_data	= NULL;
+	size_t		hash_data_len	= 0;
+	char*		hash_str	= (char*) malloc(129 * sizeof(char));	/* SHA512 = 128 hex digits + \0 */
+	EVP_MD_CTX	hash_ctx;
+	unsigned char	hash[64]	= { 0 };				/* SHA512 = 64 bytes */
+	unsigned int	hash_len	= 64;
+	int		i		= 0;
 	
 	get_hash_input(ctx, selector, &hash_data, &hash_data_len);
 	

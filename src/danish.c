@@ -39,10 +39,10 @@ void show_usage(void)
 	printf("usage:\n");
 	printf("\tdanish -n <hostname> -c <certfile> [-H] [-e] [-t] [-q] [-M]\n");
 	printf("\t       [-r <certreq>] -p <port> -P <tcp | udp>\n");
-	printf("\t       [-u <0-3>] [-s <0,1>] [-m <1,2>]\n");
+	printf("\t       [-u <0-3>] [-s <0,1>] [-m <0-2>]\n");
 	printf("\n");
 	printf("\tdanish -n <hostname> -c <certfile> -E <emailAddress>\n");
-	printf("\t       [-e] [-t] [-q] [-M] [-u <0-3>] [-s <0,1>] [-m <1,2>]\n");
+	printf("\t       [-e] [-t] [-q] [-M] [-u <0-3>] [-s <0,1>] [-m <0-2>]\n");
 	printf("\n");
 	printf("\tdanish -h\n");
 	printf("\n");
@@ -53,18 +53,18 @@ void show_usage(void)
 	printf("\t-q            be quiet (suppress output from the checks that are\n");
 	printf("\t              executed and only output the generated record)\n");
 	printf("\t-t            Use TYPExx as record type instead of TLSA or SMIMEA\n");
-	printf("\t-u <0-3>      Certificate usage; can be:\n");
+	printf("\t-u <0-3>      Certificate usage*; can be:\n");
 	printf("\t                  0 - CA constraint\n");
 	printf("\t                  1 - certificate constraint with PKIX validation\n");
-	printf("\t                      (default)\n");
 	printf("\t                  2 - trust anchor\n");
 	printf("\t                  3 - self-signed certificate\n");
-	printf("\t-s <0,1>      Selector; can be:\n");
-	printf("\t                  0 - full certificate (default)\n");
+	printf("\t-s <0,1>      Selector*; can be:\n");
+	printf("\t                  0 - full certificate\n");
 	printf("\t                  1 - subjectPublicKeyInfo\n");
-	printf("\t-m <1,2>      Matching type; can be:\n");
-	printf("\t                  0 - unsupported by danish\n");
-	printf("\t                  1 - SHA256 hash (default)\n");
+	printf("\t-m <0-2>      Matching type*; can be:\n");
+	printf("\t                  0 - DER encoding of certificate or\n");
+	printf("\t                      subjectPublicKeyInfo\n");
+	printf("\t                  1 - SHA256 hash\n");
 	printf("\t                  2 - SHA512 hash\n");
 	printf("\n");
 	printf("\nUsage for TLSA records:\n");
@@ -75,11 +75,13 @@ void show_usage(void)
 	printf("\t-r <reqfile>  check if the certificate matches the certificate\n");
 	printf("\t              request in <reqfile>\n");
 	printf("\t-p            specify the TLS service port\n");
-	printf("\t-P            specify the protocol (udp or tcp)\n");
+	printf("\t-P            specify the protocol (udp or tcp)\n\n");
+	printf("\t*Default usage,selector,matching for TLSA is 1 0 1\n");
 	printf("\nUsage for SMIMEA records:\n");
 	printf("\t-E <address>  generate an SMIMEA record for <emailAddress>\n");
 	printf("\t-n <hostname> use <hostname> as base name for the SMIMEA record\n");
-	printf("\t-M            check if the certificate matches <emailAddress>\n");
+	printf("\t-M            check if the certificate matches <emailAddress>\n\n");
+	printf("\t*Default usage,selector,matching for SMIMEA is 1 0 0\n");
 	printf("\n");
 	printf("\t-h            print this help message\n");
 	printf("\n");
@@ -98,9 +100,12 @@ int main(int argc, char* argv[])
 	char* 	reqfile		= NULL;
 	int 	check_exp	= 0;
 	int 	match_subject	= 0;
-	int 	usage		= 1;
-	int 	selector	= 0;
-	int 	match_type	= 1;
+	int 	set_usage	= -1;
+	int 	set_selector	= -1;
+	int 	set_match_type	= -1;
+	int	def_usage	= 1;
+	int	def_selector	= 0;
+	int	def_match_type	= 1;
 	int	 c		= 0;
 	int 	par_error  	= 0;
 	char* 	proto[2]	= { "tcp", "udp" };
@@ -142,31 +147,31 @@ int main(int argc, char* argv[])
 			match_subject = 1;
 			break;
 		case 'u':
-			usage = atoi(optarg);
+			set_usage = atoi(optarg);
 			
-			if ((usage < 0) || (usage > 3))
+			if ((set_usage < 0) || (set_usage > 3))
 			{
-				fprintf(stderr, "Invalid certificate usage (%d) specified\n", usage);
+				fprintf(stderr, "Invalid certificate usage (%d) specified\n", set_usage);
 				
 				par_error = 1;
 			}
 			break;
 		case 's':
-			selector = atoi(optarg);
+			set_selector = atoi(optarg);
 			
-			if ((selector < 0) || (selector > 1))
+			if ((set_selector < 0) || (set_selector > 1))
 			{
-				fprintf(stderr, "Invalid selector (%d) specified\n", selector);
+				fprintf(stderr, "Invalid selector (%d) specified\n", set_selector);
 				
 				par_error = 1;
 			}
 			break;
 		case 'm':
-			match_type = atoi(optarg);
+			set_match_type = atoi(optarg);
 			
-			if ((match_type < 1) || (match_type > 2))
+			if ((set_match_type < 0) || (set_match_type > 2))
 			{
-				fprintf(stderr, "Invalid match type (%d) specified\n", match_type);
+				fprintf(stderr, "Invalid match type (%d) specified\n", set_match_type);
 				
 				par_error = 1;
 			}
@@ -198,10 +203,17 @@ int main(int argc, char* argv[])
 			break;
 		case 'H':
 			do_tlsa = 1;
+			def_usage = 1;
+			def_selector = 0;
+			def_match_type = 1;
 			break;
 		case 'E':
 			do_smimea = 1;
 			do_tlsa = 0;
+
+			def_usage = 1;
+			def_selector = 0;
+			def_match_type = 0;
 
 			mailAddress = strdup(optarg);
 			break;
@@ -224,24 +236,28 @@ int main(int argc, char* argv[])
 		
 		par_error = 1;
 	}
+
+	if (set_usage == -1)		set_usage	= def_usage;
+	if (set_selector == -1) 	set_selector	= def_selector;
+	if (set_match_type == -1)	set_match_type	= def_match_type;
 	
-	if ((usage < 0) || (usage > 3))
+	if ((set_usage < 0) || (set_usage > 3))
 	{
-		fprintf(stderr, "Unknown DANE certificate usage %d!\n\n", usage);
+		fprintf(stderr, "Unknown DANE certificate usage %d!\n\n", set_usage);
 		
 		par_error = 1;
 	}
 	
-	if ((selector < 0) || (selector > 1))
+	if ((set_selector < 0) || (set_selector > 1))
 	{
-		fprintf(stderr, "Unknown DANE certificate selector %d!\n\n", selector);
+		fprintf(stderr, "Unknown DANE certificate selector %d!\n\n", set_selector);
 		
 		par_error = 1;
 	}
 	
-	if ((match_type < 1) || (match_type > 2))
+	if ((set_match_type < 0) || (set_match_type > 2))
 	{
-		fprintf(stderr, "Unknown or unsupported DANE matching type %d!\n\n", match_type);
+		fprintf(stderr, "Unknown or unsupported DANE matching type %d!\n\n", set_match_type);
 		
 		par_error = 1;
 	}
@@ -293,6 +309,8 @@ int main(int argc, char* argv[])
 
 	if (do_tlsa)
 	{
+		char*	certAssocData	= NULL;
+
 		/* Load the certificate request if necessary */
 		init_req_ctx(&req);
 		
@@ -306,19 +324,32 @@ int main(int argc, char* argv[])
 			}
 		}
 		
+		switch(set_match_type)
+		{
+		case 0:
+			certAssocData = cert_get_der_hexstr(&crt, set_selector);
+			break;
+		case 1:
+			certAssocData = cert_get_sha256_hash(&crt, set_selector);
+			break;
+		case 2:
+			certAssocData = cert_get_sha512_hash(&crt, set_selector);
+			break;
+		}
+
 		/* Output the TLSA record */
 		if (use_typeXX)
 		{
-			printf("_%d._%s.%s.\tIN\tTYPE52\t\\# %d %02X%02X%02X%s\n",
+
+			printf("_%d._%s.%s.\tIN\tTYPE52\t\\# %zd %02X%02X%02X%s\n",
 				port,
 				proto[proto_sel],
 				hostname,
-				(match_type == 1) ? 35 : 67,
-				usage,
-				selector,
-				match_type,
-				(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
-				                    cert_get_sha512_hash(&crt, selector));
+				(strlen(certAssocData)/2) + 3,
+				set_usage,
+				set_selector,
+				set_match_type,
+				certAssocData);
 		}
 		else
 		{
@@ -326,12 +357,13 @@ int main(int argc, char* argv[])
 				port,
 				proto[proto_sel],
 				hostname,
-				usage,
-				selector,
-				match_type,
-				(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
-				                    cert_get_sha512_hash(&crt, selector));
+				set_usage,
+				set_selector,
+				set_match_type,
+				certAssocData);
 		}
+
+		free(certAssocData);
 			                    
 		/* Perform expiration check if requested */
 		if (check_exp)
@@ -354,10 +386,11 @@ int main(int argc, char* argv[])
 	else if (do_smimea)
 	{
 		char	fqdn[1024]	= { 0 };
+		char*	certAssocData	= NULL;
 
 		if (hostname != NULL)
 		{
-			if ((usage == 0) || (usage == 2))
+			if ((set_usage == 0) || (set_usage == 2))
 			{
 				snprintf(fqdn, 1024, "*._smimecert.%s.", hostname);
 			}
@@ -368,7 +401,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			if ((usage == 0) || (usage == 2))
+			if ((set_usage == 0) || (set_usage == 2))
 			{
 				snprintf(fqdn, 1024, "*._smimecert");
 			}
@@ -378,28 +411,41 @@ int main(int argc, char* argv[])
 			}
 		}
 
+		switch(set_match_type)
+		{
+		case 0:
+			certAssocData = cert_get_der_hexstr(&crt, set_selector);
+			break;
+		case 1:
+			certAssocData = cert_get_sha256_hash(&crt, set_selector);
+			break;
+		case 2:
+			certAssocData = cert_get_sha512_hash(&crt, set_selector);
+			break;
+		}
+
 		/* Output the SMIMEA record */
 		if (use_typeXX)
 		{
-			printf("%s\tIN\tTYPE53\t\\# %d %02X%02X%02X%s\n",
+			printf("%s\tIN\tTYPE53\t\\# %zd %02X%02X%02X%s\n",
 				fqdn,
-				(match_type == 1) ? 35 : 67,
-				usage,
-				selector,
-				match_type,
-				(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
-				                    cert_get_sha512_hash(&crt, selector));
+				(strlen(certAssocData)/2) + 3,
+				set_usage,
+				set_selector,
+				set_match_type,
+				certAssocData);
 		}
 		else
 		{
 			printf("%s\tIN\tSMIMEA\t%d %d %d %s\n",
 				fqdn,
-				usage,
-				selector,
-				match_type,
-				(match_type == 1) ? cert_get_sha256_hash(&crt, selector) :
-				                    cert_get_sha512_hash(&crt, selector));
+				set_usage,
+				set_selector,
+				set_match_type,
+				certAssocData);
 		}
+
+		free(certAssocData);
 
 		/* Perform expiration check if requested */
 		if (check_exp)

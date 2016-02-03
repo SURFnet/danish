@@ -62,9 +62,11 @@ int read_cert(cert_ctx* ctx, const char* file_name);
 
 int read_req(req_ctx* ctx, const char* file_name);
 
-const char* cert_get_sha256_hash(const cert_ctx* ctx, const int selector);
+char* cert_get_der_hexstr(const cert_ctx* ctx, const int selector);
 
-const char* cert_get_sha512_hash(const cert_ctx* ctx, const int selector);
+char* cert_get_sha256_hash(const cert_ctx* ctx, const int selector);
+
+char* cert_get_sha512_hash(const cert_ctx* ctx, const int selector);
 
 const char* mail_get_smimea_sha256_hash(const char* mailAddress);
 
