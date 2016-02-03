@@ -1,3 +1,7 @@
+2016-02-03  Roland van Rijswijk-Deij <roland.vanrijswijk@surfnet.nl>
+    * Added type 0 matching support
+    * FQDN for SMIMEA is now taken as right-hand side of mail address
+
 2016-01-27  Roland van Rijswijk-Deij <roland.vanrijswijk@surfnet.nl>
     * Release 0.2.0
     * Restructured build to non-nested automake
